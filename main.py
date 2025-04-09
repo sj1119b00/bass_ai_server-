@@ -27,6 +27,11 @@ if not os.path.exists(csv_path):
         writer = csv.writer(f)
         writer.writerow(["filename", "lat", "lon", "address", "timestamp", "temp", "condition", "rig", "spot_name"])
 
+# ✅ 루트 경로 응답 추가 (Render에서 확인용!)
+@app.get("/")
+def read_root():
+    return {"message": "배포 성공! 🎉"}
+
 # API 정의
 @app.post("/upload_catch")
 async def upload_catch(
