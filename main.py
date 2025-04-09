@@ -58,7 +58,7 @@ async def upload_catch(
         f.write(await photo.read())
 
     # CSV 저장
-    with open(csv_path, "a", newline="", encoding="utf-8") as f:
+    with open(csv_path, "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f)
         writer.writerow([filename, latitude, longitude, address, timestamp, temp, condition, rig, spot_name])
 
@@ -71,7 +71,7 @@ def get_catches():
         return JSONResponse(content={"catches": []})
 
     catches = []
-    with open(csv_path, "r", encoding="utf-8") as f:
+    with open(csv_path, "a", newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
         for row in reader:
             row["image_url"] = f"https://bass-ai-api.onrender.com/images/{row['filename']}"
