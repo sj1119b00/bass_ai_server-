@@ -25,7 +25,7 @@ csv_path = "data/uploads.csv"
 
 # CSV 초기 생성
 if not os.path.exists(csv_path):
-    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+    with open(csv_path, "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f)
         writer.writerow(["filename", "lat", "lon", "address", "timestamp", "temp", "condition", "rig", "spot_name"])
 
