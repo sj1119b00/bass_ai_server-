@@ -76,3 +76,11 @@ def get_catches():
             catches.append(row)
 
     return {"catches": catches}
+@app.get("/debug_csv")
+def debug_csv():
+    if not os.path.exists(csv_path):
+        return {"exists": False, "message": "CSV 파일 없음"}
+
+    with open(csv_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    return {"exists": True, "content": content}
