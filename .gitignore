@@ -1,0 +1,18 @@
+# 환경 설정 파일
+.env
+
+# 빌드 파일
+build/
+
+# OS 관련
+.DS_Store
+
+# Flutter 관련 기본 무시 파일들
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.melos_tool/
+
+# 기타 IDE 설정
+.idea/
+.vscode/
