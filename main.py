@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from datetime import datetime
+from routers import recommend
 import os
 import csv
 
@@ -23,21 +24,17 @@ os.makedirs("data", exist_ok=True)
 # CSV 경로
 csv_path = "data/uploads.csv"
 
-# CSV 초기 헤더 생성 (위경도 제거됨)
 if not os.path.exists(csv_path):
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["filename", "address", "timestamp", "temp", "condition", "rig", "spot_name"])
 
-# 이미지 접근 가능하게 설정
 app.mount("/images", StaticFiles(directory="images"), name="images")
 
-# 루트 확인용
 @app.get("/")
 def read_root():
     return {"message": "배포 성공! 🎉"}
 
-# ✅ 업로드 API (위도/경도 제거됨)
 @app.post("/upload_catch")
 async def upload_catch(
     photo: UploadFile = File(...),
@@ -48,21 +45,18 @@ async def upload_catch(
     rig: str = Form(...),
     spot_name: str = Form(...)
 ):
-    # 이미지 저장
     filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{photo.filename}"
     image_path = os.path.join("images", filename)
 
     with open(image_path, "wb") as f:
         f.write(await photo.read())
 
-    # CSV 저장
     with open(csv_path, "a", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow([filename, address, timestamp, temp, condition, rig, spot_name])
 
     return {"status": "success", "filename": filename}
 
-# ✅ 조과 목록 조회
 @app.get("/catches")
 def get_catches():
     if not os.path.exists(csv_path):
@@ -76,6 +70,7 @@ def get_catches():
             catches.append(row)
 
     return {"catches": catches}
+
 @app.get("/debug_csv")
 def debug_csv():
     if not os.path.exists(csv_path):
@@ -84,3 +79,6 @@ def debug_csv():
     with open(csv_path, "r", encoding="utf-8") as f:
         content = f.read()
     return {"exists": True, "content": content}
+
+# ✅ 추천 라우터 등록
+app.include_router(recommend.router)
