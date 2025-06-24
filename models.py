@@ -39,9 +39,13 @@ class Catch(Base):
     __tablename__ = "catches"
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"))
-    image_path = Column(String)
-    bait = Column(String)
+    spot_name = Column(String)
+    rig = Column(String)
+    temp = Column(Float)
+    condition = Column(String)
+    timestamp = Column(DateTime)
     address = Column(String)
+    filename = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class CommunityPost(Base):

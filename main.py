@@ -6,12 +6,14 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 import os
 import json
+import requests
 
 from database import Base, engine, SessionLocal, create_tables
-from models import Catch, User
+from models import Catch, User, TrainingFishingData
 from routers.ai import recommend
 from routers import user 
 from auth.auth import router as auth_router
+from config import KAKAO_API_KEY
 
 # ✅ 테이블 생성
 create_tables()
@@ -81,7 +83,7 @@ async def verify_user(request: Request):
             content=json.loads(json.dumps({"valid": False}, ensure_ascii=False))
         )
 
-# ✅ 로그인 시 레벨 타이클 계산 함수
+# ✅ 로그인 시 레벨 타이틀 계산 함수
 def get_title_by_level(level: int) -> str:
     return {
         1: "입문자",
@@ -90,6 +92,15 @@ def get_title_by_level(level: int) -> str:
         4: "포인트 마스터",
         5: "배스헬터 고수"
     }.get(level, "배스 신입")
+
+# ✅ 문자열 바람 → 숫자 변환 함수
+def map_wind_str_to_float(wind_str: str) -> float:
+    mapping = {
+        "약함": 1.0,
+        "보통": 3.0,
+        "강함": 6.0
+    }
+    return mapping.get(wind_str.strip(), 3.0)
 
 # ✅ 회원가입 or 로그인 API
 @app.post("/register_or_login")
@@ -115,34 +126,72 @@ def register_or_login(
         db.refresh(new_user)
         return {"msg": "회원가입 완료", "user_id": new_user.id}
 
-# ✅ 조과 업로드 API
+# ✅ 조과 업로드 API (Catch + TrainingFishingData 저장)
 @app.post("/upload_catch")
 async def upload_catch(
     photo: UploadFile = File(...),
+    user_id: int = Form(...),
+    spot_name: str = Form(...),
     address: str = Form(...),
-    timestamp: str = Form(...),
-    temp: float = Form(...),
-    condition: str = Form(...),
     rig: str = Form(...),
-    spot_name: str = Form(...)
+    temperature: float = Form(...),
+    wind: str = Form(...),
+    weather: str = Form(...),
+    time_period: str = Form(...),
+    timestamp: str = Form(...)
 ):
+    # ✅ 이미지 저장
     filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{photo.filename}"
     image_path = os.path.join("images", filename)
-
     with open(image_path, "wb") as f:
         f.write(await photo.read())
 
+    # ✅ 주소 → 위도/경도 변환
+    headers = {"Authorization": f"KakaoAK {KAKAO_API_KEY}"}
+    kakao_res = requests.get(
+        "https://dapi.kakao.com/v2/local/search/address.json",
+        headers=headers,
+        params={"query": address}
+    )
+    kakao_json = kakao_res.json()
+    if not kakao_json["documents"]:
+        raise HTTPException(status_code=400, detail="주소를 위경도로 변환할 수 없습니다.")
+    lat = float(kakao_json["documents"][0]["y"])
+    lon = float(kakao_json["documents"][0]["x"])
+
+    # ✅ DB 저장
     db = SessionLocal()
+
+    # 1) Catch 저장
     catch = Catch(
+        user_id=user_id,
         spot_name=spot_name,
-        address=address,
         rig=rig,
-        temp=temp,
-        condition=condition,
+        temp=temperature,
+        condition=weather,
         timestamp=datetime.fromisoformat(timestamp),
+        address=address,
         filename=filename
     )
     db.add(catch)
+
+    # 2) TrainingFishingData 저장
+    training_data = TrainingFishingData(
+        spot_name=spot_name,
+        address=address,
+        latitude=lat,
+        longitude=lon,
+        weather=weather,
+        time_period=time_period,
+        bait_type=rig,
+        temperature=str(temperature),
+        wind=str(map_wind_str_to_float(wind)),  # ✅ 여기만 수정!
+        result=1,
+        blog_url=f"app_upload_{filename}",
+        posted_at=datetime.fromisoformat(timestamp)
+    )
+    db.add(training_data)
+
     db.commit()
     db.close()
 
@@ -152,19 +201,22 @@ async def upload_catch(
 @app.get("/catches")
 def get_catches():
     db = SessionLocal()
-    catches = db.query(Catch).all()
+    catches = db.query(Catch).filter(
+        Catch.spot_name.isnot(None),
+        Catch.spot_name != "",
+        Catch.address.isnot(None),
+        Catch.address != "",
+        Catch.filename.isnot(None),
+        Catch.filename != ""
+    ).all()
     db.close()
 
     result = []
     for row in catches:
         result.append({
             "spot_name": row.spot_name,
-            "address": row.address,
             "rig": row.rig,
-            "temp": row.temp,
-            "condition": row.condition,
-            "timestamp": row.timestamp.isoformat(),
-            "filename": row.filename,
+            "address": row.address,
             "image_url": f"/images/{row.filename}"
         })
 
